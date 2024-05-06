@@ -1,27 +1,25 @@
 package mediabot.renderer.mpv;
 
-import com.fasterxml.jackson.jr.annotationsupport.JacksonAnnotationExtension;
-import com.fasterxml.jackson.jr.ob.JSON;
-
 import java.io.IOException;
-import java.io.RandomAccessFile;
+
 import java.net.URI;
+
 import java.nio.charset.StandardCharsets;
+
 import java.util.ArrayDeque;
 import java.util.Arrays;
+import java.util.List;
+import java.util.Queue;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
-import java.util.concurrent.TimeUnit;
-import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import java.util.Queue;
 
-import mediabot.renderer.MediaBotRenderer;
-import mediabot.renderer.mpv.models.MpvRequestModel;
-import mediabot.renderer.mpv.models.MpvResponseModel;
+import org.apache.commons.io.FilenameUtils;
+import org.apache.commons.io.IOUtils;
 
 import org.fourthline.cling.model.ModelUtil;
 import org.fourthline.cling.model.types.ErrorCode;
@@ -35,10 +33,19 @@ import org.fourthline.cling.support.model.SeekMode;
 import org.fourthline.cling.support.model.TransportAction;
 import org.fourthline.cling.support.model.TransportInfo;
 import org.fourthline.cling.support.model.TransportState;
+import org.fourthline.cling.support.renderingcontrol.RenderingControlException;
 import org.fourthline.cling.support.renderingcontrol.lastchange.ChannelMute;
 import org.fourthline.cling.support.renderingcontrol.lastchange.ChannelVolume;
 import org.fourthline.cling.support.renderingcontrol.lastchange.RenderingControlVariable;
-import org.fourthline.cling.support.renderingcontrol.RenderingControlException;
+
+import org.seamless.util.OS;
+
+import com.fasterxml.jackson.jr.annotationsupport.JacksonAnnotationExtension;
+import com.fasterxml.jackson.jr.ob.JSON;
+
+import mediabot.renderer.MediaBotRenderer;
+import mediabot.renderer.mpv.models.MpvRequestModel;
+import mediabot.renderer.mpv.models.MpvResponseModel;
 
 public class MpvMediaBotRenderer implements MediaBotRenderer {
 	private static final Logger log = Logger.getLogger(MpvMediaBotRenderer.class.getName());
@@ -52,11 +59,10 @@ public class MpvMediaBotRenderer implements MediaBotRenderer {
 	private AtomicInteger count = new AtomicInteger();
 	private byte[] buffer = new byte[2048];
 
+	private MpvClient client;
 	private LastChange avTransportLastChange;
         private LastChange renderingControlLastChange;
 	private JSON json;
-
-	private RandomAccessFile file;
 
 	private long readTimestamp = 0;
 	private long time = 0;
@@ -104,7 +110,7 @@ public class MpvMediaBotRenderer implements MediaBotRenderer {
 
 			log.fine(String.format("sent - %s", str));
 
-			file.write(String.format("%s\n", str).getBytes(StandardCharsets.UTF_8));
+			client.write(String.format("%s\n", str).getBytes(StandardCharsets.UTF_8));
 
 			count.incrementAndGet();
 			condition.signalAll();
@@ -428,7 +434,7 @@ public class MpvMediaBotRenderer implements MediaBotRenderer {
 			if(isReadNeeded()){
 				//TODO - handle the case when partial lines are returned
 
-				int byteCount = file.read(buffer);
+				int byteCount = client.read(buffer);
 
 				readTimestamp = System.nanoTime();
 
@@ -594,37 +600,64 @@ public class MpvMediaBotRenderer implements MediaBotRenderer {
 	}
 
 	public void start() throws IOException {
-		//TODO - check OS 
-		//TODO - linux - use --idle --force-window instead of --keep-open=yes
-		//mpv launch command
-		//socket/pipe path
 		String filepath = System.getProperty("MEDIABOT_RENDERER_MPV_FILEPATH");
 
 		if(filepath == null){
 			filepath = "mpv";
+
+			if(OS.checkForWindows()){
+				filepath = String.format("%s.exe", filepath);
+			}
 		}
+		
+		log.fine(String.format("mpv filepath - %s", filepath));
 
 		String pipe = System.getProperty("MEDIABOT_RENDERER_IPC_FILEPATH"); 
 
 		if(pipe == null){
-			pipe = "\\\\.\\pipe\\mpvsocket";
+			if(OS.checkForWindows()){
+				pipe = "\\\\.\\mediabot\\mpv";
+			}
+			else{
+				pipe = FilenameUtils.concat(System.getProperty("user.dir"), "mediabot"); //TODO - use temp directory
+			}
 		}	
 
-		Process process = Runtime.getRuntime().exec(toArray("cmd", "/c", "start", "/wait", filepath, "--no-terminal", "--fs", "--keep-open=yes", String.format("--input-ipc-server=%s", pipe)));
+		log.fine(String.format("input-ipc-servce path - %s", pipe));
+
+		String[] args = toArray(filepath, "--no-terminal", "--fs", "--idle", "--force-window", String.format("--input-ipc-server=%s", pipe));
+
+		if(OS.checkForWindows()){
+			args = toArray("cmd", "/c", "start", "/wait", filepath, "--no-terminal", "--fs", "--keep-open=yes", String.format("--input-ipc-server=%s", pipe));
+		}  
+
+		Process process = Runtime.getRuntime().exec(args);
 
 		sleep(1500);
 
-		file = new RandomAccessFile(pipe, "rw");
+		if(OS.checkForWindows()){
+			client = new NamedPipeMpvClient();
+		}
+		else{
+			client = new NetcatMpvClient();
+		}
+		
+		try{
+			client.open(pipe);
 
-		addListeners();
+			addListeners();
 
-		Queue<MpvResponseModel> queue = new ArrayDeque<>();
-		int count = 0;
+			Queue<MpvResponseModel> queue = new ArrayDeque<>();
+			int count = 0;
 
-		while(process.isAlive() && (count = read(queue)) > -1){
-			while(!queue.isEmpty()){
-				processMpvResponse(queue.poll());
-			}	
+			while(process.isAlive() && (count = read(queue)) > -1){
+				while(!queue.isEmpty()){
+					processMpvResponse(queue.poll());
+				}	
+			}
+		}
+		finally{
+			IOUtils.closeQuietly(client);
 		}
 	}
 }
