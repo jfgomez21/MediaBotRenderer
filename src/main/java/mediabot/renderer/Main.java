@@ -1,14 +1,24 @@
 package mediabot.renderer;
 
+import java.awt.image.BufferedImage;
+
+import java.io.ByteArrayInputStream;
+import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 
-import mediabot.renderer.mpv.MpvMediaBotRenderer;
-import mediabot.renderer.upnp.MediaBotAudioRenderingControl;
-import mediabot.renderer.upnp.MediaBotAVTransportService;
+import javax.imageio.ImageIO;
 
-import org.fourthline.cling.binding.annotations.AnnotationLocalServiceBinder;
+import org.apache.commons.io.IOUtils;
+
+import org.fourthline.cling.UpnpService;
+import org.fourthline.cling.UpnpServiceImpl;
 import org.fourthline.cling.binding.LocalServiceBinder;
+import org.fourthline.cling.binding.annotations.AnnotationLocalServiceBinder;
 import org.fourthline.cling.model.DefaultServiceManager;
+import org.fourthline.cling.model.ModelUtil;
+import org.fourthline.cling.model.ServiceManager;
+import org.fourthline.cling.model.ValidationException;
 import org.fourthline.cling.model.meta.DeviceDetails;
 import org.fourthline.cling.model.meta.DeviceIdentity;
 import org.fourthline.cling.model.meta.Icon;
@@ -16,24 +26,56 @@ import org.fourthline.cling.model.meta.LocalDevice;
 import org.fourthline.cling.model.meta.LocalService;
 import org.fourthline.cling.model.meta.ManufacturerDetails;
 import org.fourthline.cling.model.meta.ModelDetails;
-import org.fourthline.cling.model.ModelUtil;
-import org.fourthline.cling.model.ServiceManager;
 import org.fourthline.cling.model.types.UDADeviceType;
 import org.fourthline.cling.model.types.UDN;
-import org.fourthline.cling.model.ValidationException;
 import org.fourthline.cling.support.avtransport.lastchange.AVTransportLastChangeParser;
 import org.fourthline.cling.support.connectionmanager.ConnectionManagerService;
 import org.fourthline.cling.support.lastchange.LastChange;
 import org.fourthline.cling.support.lastchange.LastChangeAwareServiceManager;
 import org.fourthline.cling.support.model.ProtocolInfo;
 import org.fourthline.cling.support.renderingcontrol.lastchange.RenderingControlLastChangeParser;
-import org.fourthline.cling.UpnpService;
-import org.fourthline.cling.UpnpServiceImpl;
+
 import org.seamless.util.MimeType;
+
+import mediabot.renderer.mpv.MpvMediaBotRenderer;
+import mediabot.renderer.upnp.MediaBotAVTransportService;
+import mediabot.renderer.upnp.MediaBotAudioRenderingControl;
 
 public class Main {
 	public static final long LAST_CHANGE_FIRING_INTERVAL_MILLISECONDS = 500;
+	
+	private static byte[] getResourceAsBytes(String filename) throws IOException {
+		InputStream input = null;
 
+		try{
+			if(filename.startsWith("classpath:/")){
+				input = Main.class.getClassLoader().getResourceAsStream(filename.replace("classpath:/", ""));
+			}
+			else{
+				input = new FileInputStream(filename);
+			}
+
+			return IOUtils.toByteArray(input);
+		}
+		finally{
+			IOUtils.closeQuietly(input);
+		}
+	}
+
+	private static Icon createDeviceIcon(byte[] bytes, int width, int height, int depth) throws IOException {
+		return new Icon("image/png", width, height, depth, MediaBotRenderer.class.getName(), bytes);
+	}
+
+	private static Icon createDeviceIcon(String filename) throws IOException {
+		byte[] bytes = getResourceAsBytes(filename);
+
+		try(InputStream input = new ByteArrayInputStream(bytes)){
+			BufferedImage image = ImageIO.read(input);
+
+			return createDeviceIcon(bytes, image.getWidth(), image.getHeight(), image.getColorModel().getPixelSize());
+		}	
+	}
+	
 	public static void main(String[] args){
 		LastChange avTransportLastChange = new LastChange(new AVTransportLastChangeParser());
 		LastChange renderingControlLastChange = new LastChange(new RenderingControlLastChangeParser());
@@ -85,14 +127,14 @@ public class Main {
 
 		try{
 			LocalDevice device = new LocalDevice(
-				new DeviceIdentity(UDN.uniqueSystemIdentifier("Cling MediaBotRenderer")),
+				new DeviceIdentity(UDN.uniqueSystemIdentifier("MediaBotRenderer")),
 				new UDADeviceType("MediaBotRenderer", 1),
 				new DeviceDetails(
 					"MediaBotRenderer on " + ModelUtil.getLocalHostName(false),
-					new ManufacturerDetails("Cling", "http://4thline.org/projects/cling/"),
-					new ModelDetails("Cling MediaBotRenderer", "Mediabot Renderer", "1", "http://4thline.org/projects/cling/mediarenderer/")
+					new ManufacturerDetails("MediaBotRenderer", "https://github.com/jfgomez21/MediaBotRenderer"),
+					new ModelDetails("MediaBotRenderer", "MediabotRenderer", "1", "https://github.com/jfgomez21/MediaBotRenderer")
 				),
-				(Icon[]) null, //new Icon[]{createDefaultDeviceIcon()},
+				new Icon[] {createDeviceIcon("classpath:/smart-tv.png")},
 				new LocalService[]{
 					avTransportService,
 					renderingControlService,

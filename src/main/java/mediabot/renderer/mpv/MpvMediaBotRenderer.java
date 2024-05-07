@@ -70,31 +70,6 @@ public class MpvMediaBotRenderer implements MediaBotRenderer {
 	private int previousVolume = 100;
 	private boolean isEOF = false;
 
-	//commands - { "command": ["command_name", "param1", "param2", ...] }
-	//events - { "event": "event_name" }
-	//associate request and response via requestId e.g. 
-	//	{ "command": ["get_property", "time-pos"], "request_id": 100 }
-	//	{ "error": "success", "data": 1.468135, "request_id": 100 }
-	//commands list
-	//	https://mpv.io/manual/stable/#json-ipc
-	//	https://mpv.io/manual/stable/#list-of-input-commands
-	//
-	//	Commands
-	//	Load file - { "command": ["loadfile", "<url>"] }
-	//	Seek - { "command": ["seek", "<seconds>", "absolute"] }
-	//	Pause - { "command": ["set_property", "pause", true] }
-	//	Volume - { "command": ["get_property", "volume"] }
-	//	Response - { "error": "success"}
-	//
-	//	Observe Properties
-	//	Get Volume events - { "command": ["observe_property", 1, "volume"] }
-	//	Get Position events - { "command": ["observe_property", 1, "time-pos"] }
-	//	Get EOF events - { "command": ["observe_property", 1, "eof-reached"] }
-	//	Repsonse - { "event": "property-change", "id": 1, "data": 52.0, "name": "volume" }
-	//
-	//	Events
-	//	File Loaded - {"event":"file-loaded"}
-
 	public MpvMediaBotRenderer(LastChange avTransportLastChange, LastChange renderingControlLastChange){
 		this.avTransportLastChange = avTransportLastChange;
 		this.renderingControlLastChange = renderingControlLastChange;
@@ -615,11 +590,10 @@ public class MpvMediaBotRenderer implements MediaBotRenderer {
 		String pipe = System.getProperty("MEDIABOT_RENDERER_IPC_FILEPATH"); 
 
 		if(pipe == null){
+			pipe = FilenameUtils.concat(System.getProperty("java.io.tmpdir"), "mediabot");
+
 			if(OS.checkForWindows()){
-				pipe = "\\\\.\\mediabot\\mpv";
-			}
-			else{
-				pipe = FilenameUtils.concat(System.getProperty("user.dir"), "mediabot"); //TODO - use temp directory
+				pipe = "\\\\.\\mediabot";
 			}
 		}	
 
