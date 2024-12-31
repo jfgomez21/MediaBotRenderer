@@ -13,8 +13,8 @@
 	<properties>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 		<project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
-		<maven.compiler.source>1.8</maven.compiler.source>
-		<maven.compiler.target>1.8</maven.compiler.target>
+		<maven.compiler.source>17</maven.compiler.source>
+		<maven.compiler.target>17</maven.compiler.target>
 	</properties>		
 	<repositories>
 		<repository>
@@ -67,6 +67,11 @@
 			<version>2.17.0</version>
 		</dependency>
 		<dependency>
+			<groupId>com.konghq</groupId>
+			<artifactId>unirest-java-core</artifactId>
+			<version>4.4.5</version>
+		</dependency>
+		<dependency>
 			<groupId>junit</groupId>
 			<artifactId>junit</artifactId>
 			<version>4.12</version>
@@ -81,6 +86,20 @@
 	</dependencies>
 	<build>
 		<plugins>
+			<plugin>
+				<artifactId>maven-clean-plugin</artifactId>
+				<version>3.4.0</version>
+				<configuration>
+					<filesets>
+						<fileset>
+							<directory>lib</directory>
+							<includes>
+								<include>**/*.jar</include>
+							</includes>
+						</fileset>
+					</filesets>
+				</configuration>
+			</plugin>
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-compiler-plugin</artifactId>
@@ -99,6 +118,9 @@
 							<addClasspath>true</addClasspath>
 							<mainClass>Main</mainClass>
 						</manifest>
+						<manifestEntries>
+							<Add-Exports>java.base/sun.net.www.protocol.http</Add-Exports>
+						</manifestEntries>
 					</archive>
 				</configuration>
 			</plugin>
@@ -116,6 +138,9 @@
 								<manifest>
 									<mainClass>mediabot.renderer.Main</mainClass>
 								</manifest>
+								<manifestEntries>
+									<Add-Exports>java.base/sun.net.www.protocol.http</Add-Exports>
+								</manifestEntries>
 							</archive>
 							<descriptorRefs>
 								<descriptorRef>jar-with-dependencies</descriptorRef>
@@ -161,4 +186,39 @@
 			</plugin>
 		</plugins>
 	</build>	
+	<profiles>
+		<profile>
+			<id>linux</id>
+			<activation>
+				<os>
+					<family>unix</family>
+					<name>Linux</name>
+				</os>
+				<activeByDefault>true</activeByDefault>
+			</activation>
+			<dependencies>
+				<dependency>
+					<groupId>org.eclipse.platform</groupId>
+					<artifactId>org.eclipse.swt.gtk.linux.x86_64</artifactId>
+					<version>3.127.0</version>
+				</dependency>
+			</dependencies>
+		</profile>
+		<profile>
+			<id>windows</id>
+			<activation>
+				<os>
+					<family>Windows</family>
+				</os>
+			</activation>
+			<dependencies>
+				<dependency>
+					<groupId>org.eclipse.platform</groupId>
+					<artifactId>org.eclipse.swt.win32.win32.x86_64</artifactId>
+					<version>3.127.0</version>
+				</dependency>
+			</dependencies>
+		</profile>
+	</profiles>
 </project>
+
