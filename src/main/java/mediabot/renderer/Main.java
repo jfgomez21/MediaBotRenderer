@@ -1,21 +1,18 @@
 package mediabot.renderer;
 
 import java.awt.image.BufferedImage;
+import javax.imageio.ImageIO;
 
 import java.io.ByteArrayInputStream;
 import java.io.FileInputStream;
-import java.io.IOException;
 import java.io.InputStream;
+import java.io.IOException;
 
-import java.util.List;
-
-import javax.imageio.ImageIO;
-
+import mediabot.renderer.mpv.MpvMediaBotRenderer;
+import mediabot.renderer.swt.SwtContentDirectoryClient;
+import mediabot.renderer.upnp.MediaBotAVTransportService;
+import mediabot.renderer.upnp.MediaBotAudioRenderingControl;
 import org.apache.commons.io.IOUtils;
-
-import org.eclipse.swt.widgets.Display;
-import org.eclipse.swt.widgets.Shell;
-
 import org.fourthline.cling.UpnpService;
 import org.fourthline.cling.UpnpServiceImpl;
 import org.fourthline.cling.binding.LocalServiceBinder;
@@ -24,7 +21,6 @@ import org.fourthline.cling.model.DefaultServiceManager;
 import org.fourthline.cling.model.ModelUtil;
 import org.fourthline.cling.model.ServiceManager;
 import org.fourthline.cling.model.ValidationException;
-import org.fourthline.cling.model.message.header.STAllHeader;
 import org.fourthline.cling.model.meta.DeviceDetails;
 import org.fourthline.cling.model.meta.DeviceIdentity;
 import org.fourthline.cling.model.meta.Icon;
@@ -40,13 +36,7 @@ import org.fourthline.cling.support.lastchange.LastChange;
 import org.fourthline.cling.support.lastchange.LastChangeAwareServiceManager;
 import org.fourthline.cling.support.model.ProtocolInfo;
 import org.fourthline.cling.support.renderingcontrol.lastchange.RenderingControlLastChangeParser;
-
 import org.seamless.util.MimeType;
-
-import mediabot.renderer.mpv.MpvMediaBotRenderer;
-import mediabot.renderer.swt.SwtContentDirectoryClient;
-import mediabot.renderer.upnp.MediaBotAVTransportService;
-import mediabot.renderer.upnp.MediaBotAudioRenderingControl;
 
 public class Main {
 	public static final long LAST_CHANGE_FIRING_INTERVAL_MILLISECONDS = 500;

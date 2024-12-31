@@ -25,8 +25,7 @@ public class ApplicationMouseAdapter extends MouseAdapter {
 			UpnpItemType type = (UpnpItemType) control.getData("type");
 
 			if(type == UpnpItemType.DEVICE || type == UpnpItemType.CONTAINER){
-				//TODO - calculate page size based on whats currently visible
-				client.browseContent((Service) control.getData("service"), (String) control.getData("objectId"));
+				client.browseContent((Service) control.getData("service"), (String) control.getData("objectId"), 0L, 15L);
 			}
 		}
 	}

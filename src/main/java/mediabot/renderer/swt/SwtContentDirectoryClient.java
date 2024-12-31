@@ -1,7 +1,5 @@
 package mediabot.renderer.swt;
 
-import java.io.InputStream;
-
 import java.net.MalformedURLException;
 import java.net.URI;
 
@@ -11,15 +9,12 @@ import org.eclipse.swt.SWT;
 import org.eclipse.swt.custom.ScrolledComposite;
 import org.eclipse.swt.events.ControlAdapter;
 import org.eclipse.swt.events.ControlEvent;
-import org.eclipse.swt.events.MouseAdapter;
-import org.eclipse.swt.graphics.Color;
-import org.eclipse.swt.graphics.Image;
+import org.eclipse.swt.events.MouseListener;
 import org.eclipse.swt.graphics.Point;
 import org.eclipse.swt.graphics.Rectangle;
 import org.eclipse.swt.layout.FillLayout;
 import org.eclipse.swt.layout.RowData;
 import org.eclipse.swt.layout.RowLayout;
-import org.eclipse.swt.widgets.Combo;
 import org.eclipse.swt.widgets.Composite;
 import org.eclipse.swt.widgets.Control;
 import org.eclipse.swt.widgets.Display;
@@ -63,7 +58,9 @@ public class SwtContentDirectoryClient extends DefaultRegistryListener implement
 	private Text search;
 	private Label path;
 	private ScrolledComposite scrolledComposite;
-	private MouseAdapter mouseAdapter; 
+	private MouseListener mouseListener; 
+	private PaginatedSelectionAdapter selectionListener;
+	private String objectId;
 
 	public SwtContentDirectoryClient(){
 	}
@@ -114,7 +111,7 @@ public class SwtContentDirectoryClient extends DefaultRegistryListener implement
 			}
 		});
 
-		mouseAdapter = new ApplicationMouseAdapter(this);
+		mouseListener = new ApplicationMouseAdapter(this);
 
 		shell.pack();
 		shell.open();
@@ -185,7 +182,7 @@ public class SwtContentDirectoryClient extends DefaultRegistryListener implement
 		Composite composite = new Composite(parent, SWT.NONE);
 		composite.setLayout(new RowLayout(SWT.VERTICAL));
 		composite.setLayoutData(new RowData(300, SWT.DEFAULT));
-		composite.addMouseListener(mouseAdapter);
+		composite.addMouseListener(mouseListener);
 		composite.setData("service", service);
 		composite.setData("type", UpnpItemType.MOVIE);
 		composite.setData("objectId", obj.getId());
@@ -197,9 +194,11 @@ public class SwtContentDirectoryClient extends DefaultRegistryListener implement
 		image.addControlListener(new ControlAdapter(){
 			@Override
 			public void controlResized(ControlEvent event){
+				/*
 				if(image.getImage() != null){
 					System.out.println(String.format("%s - %dx%d", obj.getTitle(), image.getImage().getBounds().width, image.getImage().getBounds().height));
 				}
+				*/
 				parent.setSize(parent.computeSize(parent.getBounds().width, SWT.DEFAULT));
 				parent.layout();
 			}
@@ -220,8 +219,10 @@ public class SwtContentDirectoryClient extends DefaultRegistryListener implement
 	}
 
 	@Override
-	public void browseContent(Service service, String objectId, SortCriterion ... orderBy){
-		upnpService.getControlPoint().execute(new ContentBrowseActionCallback(this, service, objectId, orderBy));
+	public void browseContent(Service service, String objectId, long index, long maxResults){
+		//TODO - calculate page size according to what is visible
+
+		upnpService.getControlPoint().execute(new ContentBrowseActionCallback(this, service, objectId, index, maxResults, new SortCriterion(true, "dc:title")));
 	}
 	
 	@Override
@@ -230,25 +231,34 @@ public class SwtContentDirectoryClient extends DefaultRegistryListener implement
 	}
 
 	@Override
-	public void browseContentDirectoryStatus(Browse.Status status, Service service, List<DIDLObject> results){
+	public void browseContentDirectoryStatus(Browse.Status status, Service service, String objectId, List<DIDLObject> results, long totalCount){
 		display.asyncExec(new Runnable(){
 			@Override
 			public void run(){
 				if(status == Browse.Status.LOADING){
-					//TODO - update path label
-					Composite content = (Composite) scrolledComposite.getContent();
+					if(!objectId.equals(SwtContentDirectoryClient.this.objectId)){ 
+						//TODO - update path label
+						Composite content = (Composite) scrolledComposite.getContent();
 
-					disposeChildren(content);	
+						disposeChildren(content);	
 
-					//TODO - display loading icon
+						//TODO - display loading icon
 
-					content.setSize(content.computeSize(scrolledComposite.getClientArea().width, SWT.DEFAULT));
-					scrolledComposite.layout();
-					
-					//TODO - check if listener has already been added
-					scrolledComposite.getVerticalBar().addSelectionListener(new PaginatedSelectionAdapter(SwtContentDirectoryClient.this));
+						content.setSize(content.computeSize(scrolledComposite.getClientArea().width, SWT.DEFAULT));
+						scrolledComposite.layout();
 
-					SwtContentDirectoryClient.this.service = service;
+						SwtContentDirectoryClient.this.service = service;
+						SwtContentDirectoryClient.this.objectId = objectId;
+
+						if(selectionListener != null){
+							scrolledComposite.getVerticalBar().removeSelectionListener(selectionListener);
+
+							selectionListener = null;
+						}
+					}
+					else if(selectionListener != null){
+						selectionListener.setEnabled(false);
+					}
 				}
 				else if(status == Browse.Status.OK){
 					Composite content = (Composite) scrolledComposite.getContent();
@@ -259,7 +269,7 @@ public class SwtContentDirectoryClient extends DefaultRegistryListener implement
 						if(type == UpnpItemType.CONTAINER){
 							Label label = new Label(content, SWT.CENTER);
 							label.setText(obj.getTitle());
-							label.addMouseListener(mouseAdapter);
+							label.addMouseListener(mouseListener);
 							label.setData("service", service);
 							label.setData("type", type);
 							label.setData("objectId", obj.getId());
@@ -273,6 +283,17 @@ public class SwtContentDirectoryClient extends DefaultRegistryListener implement
 
 					content.setSize(content.computeSize(scrolledComposite.getBounds().width, SWT.DEFAULT));
 					scrolledComposite.layout();
+
+					if(selectionListener == null){
+						if(results.size() < totalCount){
+							selectionListener = new PaginatedSelectionAdapter(SwtContentDirectoryClient.this, service, objectId, 15, totalCount);
+
+							scrolledComposite.getVerticalBar().addSelectionListener(selectionListener);
+						}
+					}
+					else{
+						selectionListener.setEnabled(true);
+					}
 				}
 				else{
 					//TODO - no content
@@ -308,7 +329,7 @@ public class SwtContentDirectoryClient extends DefaultRegistryListener implement
 
 					Label label = new Label(content, SWT.CENTER);
 					label.setText(device.getDetails().getFriendlyName());
-					label.addMouseListener(mouseAdapter);
+					label.addMouseListener(mouseListener);
 					label.setData("service", service);
 					label.setData("deviceId", device.getIdentity().getUdn());
 					label.setData("type", UpnpItemType.DEVICE);

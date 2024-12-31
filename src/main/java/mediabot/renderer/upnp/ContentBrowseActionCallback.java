@@ -8,6 +8,7 @@ import org.fourthline.cling.model.message.UpnpResponse;
 import org.fourthline.cling.model.meta.Service;
 import org.fourthline.cling.support.contentdirectory.callback.Browse;
 import org.fourthline.cling.support.model.BrowseFlag;
+import org.fourthline.cling.support.model.BrowseResult;
 import org.fourthline.cling.support.model.DIDLContent;
 import org.fourthline.cling.support.model.DIDLObject;
 import org.fourthline.cling.support.model.SortCriterion;
@@ -20,12 +21,24 @@ public class ContentBrowseActionCallback extends Browse {
 	private List<DIDLObject> results = new ArrayList<>();
 	private ContentDirectoryClient client;
 	private Service service;
+	private String objectId;
+	private long totalCount;
 
-	public ContentBrowseActionCallback(ContentDirectoryClient client, Service service, String objectId, SortCriterion ... orderBy){
-		super(service, objectId, BrowseFlag.DIRECT_CHILDREN, "*", 0L, null, /*15L,*/ orderBy); //TODO - change numResults
+	public ContentBrowseActionCallback(ContentDirectoryClient client, Service service, String objectId, long index, long maxResults, SortCriterion ... orderBy){
+		super(service, objectId, BrowseFlag.DIRECT_CHILDREN, "*", index, maxResults, orderBy);
 
-		this.service = service;
 		this.client = client;
+		this.service = service;
+		this.objectId = objectId;
+	}
+
+	@Override
+	public boolean receivedRaw(ActionInvocation actionInvocation, BrowseResult browseResult) {
+		boolean result = super.receivedRaw(actionInvocation, browseResult);
+
+		totalCount = browseResult.getTotalMatchesLong();
+
+		return result;
 	}
 
 	@Override
@@ -42,8 +55,8 @@ public class ContentBrowseActionCallback extends Browse {
 	}
 
 	@Override
-	public void updateStatus(Status status) {
-		client.browseContentDirectoryStatus(status, service, results);	
+	public void updateStatus(Browse.Status status) {
+		client.browseContentDirectoryStatus(status, service, objectId, results, totalCount);	
 	}
 
 	@Override
