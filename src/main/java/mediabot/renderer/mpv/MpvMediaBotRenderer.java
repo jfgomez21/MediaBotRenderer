@@ -518,12 +518,20 @@ public class MpvMediaBotRenderer implements MediaBotRenderer {
 		}
 	}
 
-	private void eofReached(){
+	private void eofReached(boolean value){
 		lock.lock();
 
 		try{
-			transportStateChanged(TransportState.STOPPED);
-			isEOF = true;
+			if(!value){
+				if(getTransportState() != TransportState.PLAYING){
+					transportStateChanged(TransportState.PLAYING);
+				}
+			}
+			else{
+				transportStateChanged(TransportState.STOPPED);
+			}
+
+			isEOF = value;
 		}
 		finally{
 			lock.unlock();
@@ -545,17 +553,23 @@ public class MpvMediaBotRenderer implements MediaBotRenderer {
 						}
 						else if("time-pos".equals(name)){
 							setTimePosition(((Number) data).intValue());		
-						}
-						else if("eof-reached".equals(name)){
-							boolean value = ((Boolean) data).booleanValue();
-
-							if(value){
-								eofReached();
-							}
-						}
+						}	
 						else if("pause".equals(name)){
 							togglePause(((Boolean) data).booleanValue());				
 						}
+						else if("eof-reached".equals(name)){
+							//set the EOF flag and fire the state change
+							//when selecting a new file to play
+							//the eof-reached event is thrown with
+							//the data set to false
+							eofReached(((Boolean) data).booleanValue());
+						}
+					}
+					else if("eof-reached".equals(name)){
+						//set the EOF flag and fire the state change
+						//when the eof is reached, there is no data 
+						//associated with the event
+						eofReached(true);
 					}
 				}
 			}

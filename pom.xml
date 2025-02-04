@@ -99,6 +99,9 @@
 							<addClasspath>true</addClasspath>
 							<mainClass>Main</mainClass>
 						</manifest>
+						<manifestEntries>
+							<Add-Exports>java.base/sun.net.www.protocol.http</Add-Exports>
+						</manifestEntries>
 					</archive>
 				</configuration>
 			</plugin>
@@ -116,6 +119,9 @@
 								<manifest>
 									<mainClass>mediabot.renderer.Main</mainClass>
 								</manifest>
+								<manifestEntries>
+									<Add-Exports>java.base/sun.net.www.protocol.http</Add-Exports>
+								</manifestEntries>
 							</archive>
 							<descriptorRefs>
 								<descriptorRef>jar-with-dependencies</descriptorRef>
